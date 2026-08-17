@@ -173,20 +173,25 @@ def ensure_function_url() -> str:
         resp = lambda_client.get_function_url_config(FunctionName=LAMBDA_FUNCTION_NAME)
         print("Function URL already exists")
 
-    try:
-        lambda_client.add_permission(
-            FunctionName=LAMBDA_FUNCTION_NAME,
-            StatementId="function-url-invoke",
-            Action="lambda:InvokeFunctionUrl",
-            Principal="*",
-            FunctionUrlAuthType="NONE",
-        )
-    except lambda_client.exceptions.ResourceConflictException:
-        pass  # permission already granted from a previous deploy
+    # Since Oct 2025, AWS requires BOTH of these grants for a NONE-auth
+    # Function URL to actually work — InvokeFunctionUrl alone now still
+    # 403s (confirmed by hitting exactly that on the first deploy attempt).
+    # InvokedViaFunctionUrl=True scopes the second grant to only be usable
+    # through the Function URL path, not other invocation methods — AWS's
+    # own recommendation for this permission.
+    permission_calls = [
+        dict(StatementId="function-url-invoke", Action="lambda:InvokeFunctionUrl",
+             Principal="*", FunctionUrlAuthType="NONE"),
+        dict(StatementId="function-url-invoke-function", Action="lambda:InvokeFunction",
+             Principal="*", InvokedViaFunctionUrl=True),
+    ]
+    for kwargs in permission_calls:
+        try:
+            lambda_client.add_permission(FunctionName=LAMBDA_FUNCTION_NAME, **kwargs)
+        except lambda_client.exceptions.ResourceConflictException:
+            pass  # permission already granted from a previous deploy
 
     return resp["FunctionUrl"].rstrip("/")
-
-    return api["ApiEndpoint"]
 
 
 def main():

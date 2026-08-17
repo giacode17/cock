@@ -19,9 +19,20 @@ Scaffold Plan" doc if you still have it; the short version is below.
   deadline, no model-access approval wait).
 - **Embeddings**: Amazon Bedrock Titan Text Embeddings V2 (`agent/embeddings.py`) — the AWS half of the
   RAG pipeline.
-- **Backend**: Python, FastAPI (`api/app.py`), deployable to AWS Lambda later via `api/lambda_handler.py`
-  (stub only — not wired up yet, see Roadmap).
-- **Frontend**: plain HTML/JS chat page (`frontend/`).
+- **Backend**: Python, FastAPI (`api/app.py`), deployed to AWS Lambda (container image, via
+  `api/lambda_handler.py` + `infra/`) behind a Lambda Function URL.
+- **Frontend**: plain HTML/JS chat page (`frontend/`), pointed at the deployed Lambda by default.
+
+## Deployed
+
+Live endpoint: `https://gzjlbbqcb7otg5xtebur7766o40jatel.lambda-url.us-west-2.on.aws`
+
+```bash
+curl https://gzjlbbqcb7otg5xtebur7766o40jatel.lambda-url.us-west-2.on.aws/health
+```
+
+Redeploy after code changes: `python infra/deploy.py` (idempotent — rebuilds/pushes the image and updates
+the existing Lambda function in place).
 
 ## Setup
 
@@ -73,7 +84,8 @@ open frontend/index.html
 db/            schema.sql, seed_data.py, mock SBC text for 3 plans
 crdb_mcp/      MCP client wrapper around the CockroachDB Managed MCP Server
 agent/         LLM tool-use loop, tool implementations, embeddings, orchestrator
-api/           FastAPI app (local) + Lambda handler stub (not deployed yet)
+api/           FastAPI app (local + Lambda handler via Mangum)
+infra/         Dockerfile, requirements-lambda.txt, deploy.py (ECR/IAM/Lambda/Function URL via boto3)
 frontend/      plain HTML/JS chat UI
 scripts/       run_agent_cli.py — local test harness
 tests/         integration tests against a live seeded cluster
@@ -81,11 +93,12 @@ tests/         integration tests against a live seeded cluster
 
 ## Verified working end-to-end
 
-Both conversational flows (`run_agent_cli.py "<symptom>"` and `--renewal`) have been run successfully
+Both conversational flows (symptom → recommendation and renewal) have been run successfully — locally via
+`run_agent_cli.py`, through the local FastAPI server, and through the **deployed Lambda Function URL** —
 against a live CockroachDB Cloud cluster, the real Managed MCP Server, live Bedrock Titan embeddings, and
-the Anthropic API — this isn't just a code review, it produced correct, plan-grounded recommendations.
-The MCP tool schema (`crdb_mcp/mcp_client.py`) reflects the server's *actual* live schema (retrieved via
-`MCPClient.list_tools()`), not a guess from docs — see that file's docstring for specifics.
+the Anthropic API. This isn't just a code review, it produced correct, plan-grounded recommendations at
+every layer. The MCP tool schema (`crdb_mcp/mcp_client.py`) reflects the server's *actual* live schema
+(retrieved via `MCPClient.list_tools()`), not a guess from docs — see that file's docstring for specifics.
 
 ## Gotchas hit while wiring this up (already fixed in code, documented here so they don't get re-debugged)
 
@@ -104,14 +117,32 @@ The MCP tool schema (`crdb_mcp/mcp_client.py`) reflects the server's *actual* li
   instance attributes — the underlying transport uses anyio task groups that require strict same-task
   nesting. Use `contextlib.AsyncExitStack` instead (see `crdb_mcp/mcp_client.py`).
 - **Claude's extended thinking + `max_tokens`**: a low `max_tokens` can get exhausted mid-`thinking` block
-  before any visible text is emitted, silently producing an empty reply. `agent/llm.py` uses
-  `max_tokens=4096` and explicitly retries on `stop_reason == "max_tokens"` instead of returning empty text.
+  (no text yet) *or* mid-final-answer (truncated text, e.g. a comparison table cut off mid-row) — both
+  looked like valid responses at first glance. `agent/llm.py` uses `max_tokens=8192` and checks
+  `stop_reason == "max_tokens"` *before* anything else, always retrying rather than ever returning
+  partial/truncated text.
 - **`cryptography` wheel vs. conda's OpenSSL**: pip's `cryptography` wheel can fail to load
   (`symbol not found ... _EVP_DigestSqueeze`) in a fresh conda env due to an OpenSSL version mismatch.
   Fixed by installing `cryptography` from `conda-forge` instead of pip in that env.
+- **`api/app.py` needs its own `load_dotenv()`**: unlike the CLI script and seed script, nothing else
+  loads `.env` when uvicorn/Lambda import `api.app` fresh — added `load_dotenv()` at the top of the file,
+  before the `agent` imports.
+- **`psycopg2-binary` doesn't belong in the Lambda image**: it has no arm64 wheel for this Python/manylinux
+  combo and fails trying to build from source (`pg_config` not found). Realized it isn't actually needed
+  at runtime anyway (only `db/seed_data.py` uses direct SQL) — `infra/requirements-lambda.txt` is a
+  runtime-only subset that excludes it (and `certifi`, `uvicorn`, `pytest`).
+- **API Gateway HTTP API hard-caps integration timeout at ~30s**, regardless of the Lambda's own configured
+  `Timeout`. The renewal flow's multi-turn tool-calling can exceed that. Used a **Lambda Function URL**
+  instead (`infra/deploy.py:ensure_function_url`) — it proxies directly to Lambda with no such ceiling.
+- **`AWS_REGION` is a reserved Lambda env var** — `CreateFunction`/`UpdateFunctionConfiguration` reject it
+  outright if you try to set it yourself. Lambda sets it automatically from the deployed region.
+- **Public (`AuthType=NONE`) Function URLs need two resource-policy grants, not one**: since Oct 2025, AWS
+  requires both `lambda:InvokeFunctionUrl` *and* `lambda:InvokeFunction` (the latter with
+  `InvokedViaFunctionUrl=True`) — granting only the first still 403s every request, and it's not a
+  propagation delay (looks identical to one at first).
 
 ## Roadmap (not done yet)
 
-- Wire up and deploy `api/lambda_handler.py` behind API Gateway (container-image Lambda recommended —
-  the dependency set is heavier than the plain zip size limit comfortably handles).
 - Optional: swap embeddings to Voyage AI if Bedrock Titan access approval is slow.
+- Optional: tear down the now-unused `insurance-navigator-api` API Gateway HTTP API resource (superseded
+  by the Function URL, harmless but unnecessary cruft left from an earlier deploy attempt).

@@ -1,5 +1,7 @@
-// Minimal chat UI wired to the local FastAPI backend (api/app.py).
-const API_BASE = "http://localhost:8000";
+// Minimal chat UI wired to the backend (api/app.py locally, or the deployed
+// Lambda Function URL below). Swap API_BASE to switch between them.
+const API_BASE = "https://gzjlbbqcb7otg5xtebur7766o40jatel.lambda-url.us-west-2.on.aws";
+// const API_BASE = "http://localhost:8000";  // local dev (uvicorn api.app:app --reload)
 // Must match MOCK_USER_ID in .env / db/seed_data.py.
 const USER_ID = "11111111-1111-1111-1111-111111111111";
 
