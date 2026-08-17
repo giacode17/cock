@@ -1,0 +1,11 @@
+{
+  "_comment": "Placeholder. Once you create a CockroachDB Cloud cluster, go to Cloud Console > your cluster > MCP Server tab and copy the real config snippet shown there. It will give you the server URL and an auth token/config equivalent to the two fields below — put the real values in your .env as CRDB_MCP_SERVER_URL and CRDB_MCP_AUTH_TOKEN instead of here. This file exists as a visual reference for what the snippet roughly looks like, not something the code reads directly.",
+  "mcpServers": {
+    "cockroachdb": {
+      "url": "https://<your-cluster-mcp-endpoint>/mcp",
+      "headers": {
+        "Authorization": "Bearer <your-token>"
+      }
+    }
+  }
+}

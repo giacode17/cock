@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Insurance Navigator Agent</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Insurance Navigator</h1>
+    <button id="renewalBtn" type="button">Check renewal recommendation</button>
+  </header>
+
+  <main id="chatLog" aria-live="polite"></main>
+
+  <form id="chatForm">
+    <input id="chatInput" type="text" placeholder="Describe a symptom or situation…" autocomplete="off" required />
+    <button type="submit">Send</button>
+  </form>
+
+  <script src="app.js"></script>
+</body>
+</html>
