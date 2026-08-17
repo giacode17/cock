@@ -1,0 +1,16 @@
+# Runtime-only dependencies for the deployed Lambda image — deliberately
+# narrower than the top-level requirements.txt. Excluded and why:
+#   psycopg2-binary, certifi  - only used by db/seed_data.py (direct SQL,
+#                                ops-time seeding), which isn't in this image.
+#                                All runtime DB access goes through the
+#                                Managed MCP Server (crdb_mcp/mcp_client.py).
+#   uvicorn                   - local dev server only; Lambda uses Mangum.
+#   pytest, pytest-asyncio    - dev/test only.
+anthropic>=0.40.0
+boto3>=1.34.0
+python-dotenv>=1.0.1
+fastapi>=0.115.0
+mangum>=0.19.0
+mcp>=1.2.0
+httpx2
+pydantic>=2.9.0
