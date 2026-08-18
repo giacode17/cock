@@ -8,6 +8,8 @@ Wrapped for Lambda later via api/lambda_handler.py — not deployed in this pass
 """
 from __future__ import annotations
 
+import os
+
 from dotenv import load_dotenv
 
 # Must run before importing agent modules: unlike scripts/run_agent_cli.py and
@@ -24,13 +26,20 @@ from agent import orchestrator, tools  # noqa: E402
 
 app = FastAPI(title="Insurance Navigator Agent")
 
-# Wide-open CORS for local hackathon demo purposes only.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS only when running locally (uvicorn) — when deployed, the Lambda
+# Function URL's own CORS config (see infra/deploy.py:ensure_function_url)
+# already adds these headers, and adding them again here produces TWO
+# Access-Control-Allow-Origin headers on the same response. That's a CORS
+# spec violation browsers reject outright (a generic, unhelpful "Failed to
+# fetch"/"Load failed" with no real error detail) — curl doesn't enforce
+# CORS at all, so this was invisible to every curl-based test.
+if not os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
 class ChatRequest(BaseModel):
