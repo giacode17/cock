@@ -2,12 +2,22 @@
 
 Hackathon submission for the **CockroachDB × AWS Hackathon** ("Build with Agentic Memory").
 
+- **Live demo**: https://giacode17.github.io
+- **API**: https://gzjlbbqcb7otg5xtebur7766o40jatel.lambda-url.us-west-2.on.aws
+- **License**: [MIT](LICENSE)
+- Full writeup for judging (features, which CockroachDB/AWS tools were used and how, feedback): [SUBMISSION.md](SUBMISSION.md)
+
 An agent that stores an employee's insurance plan, recommends where to seek care for a symptom (with a
 cost-tier estimate) grounded in the plan's real Summary of Benefits and Coverage (SBC) text, logs visits,
-and at renewal time suggests whether to switch plans based on that logged history.
+and at renewal time suggests whether to switch plans based on that logged history. This doc covers
+setup/running the code — see [SUBMISSION.md](SUBMISSION.md) for the hackathon-judging writeup.
 
-Full design rationale lives in the plan this was scaffolded from: see the "Insurance Navigator Agent —
-Scaffold Plan" doc if you still have it; the short version is below.
+## Architecture
+
+![Architecture diagram: a browser request flows through a Lambda Function URL into a container-image Lambda running the agent, which calls Anthropic for reasoning, Bedrock to embed the query, and the CockroachDB Managed MCP Server for every structured and vector read/write; a dashed path shows the one exception, the ops-time seed script writing to CockroachDB directly.](docs/architecture.svg)
+
+*Every runtime read/write goes through the CockroachDB Managed MCP Server — the only exception is
+`db/seed_data.py`, an ops-time script that writes directly, shown as the dashed path.*
 
 ## Stack
 
@@ -25,14 +35,18 @@ Scaffold Plan" doc if you still have it; the short version is below.
 
 ## Deployed
 
-Live endpoint: `https://gzjlbbqcb7otg5xtebur7766o40jatel.lambda-url.us-west-2.on.aws`
+- **Chat UI**: https://giacode17.github.io — a static GitHub Pages copy of `frontend/`, pointed at the
+  Lambda endpoint below (see `frontend/app.js:API_BASE`).
+- **API** (AWS Lambda, container image, behind a Function URL):
+  `https://gzjlbbqcb7otg5xtebur7766o40jatel.lambda-url.us-west-2.on.aws`
 
 ```bash
 curl https://gzjlbbqcb7otg5xtebur7766o40jatel.lambda-url.us-west-2.on.aws/health
 ```
 
-Redeploy after code changes: `python infra/deploy.py` (idempotent — rebuilds/pushes the image and updates
-the existing Lambda function in place).
+Redeploy the API after code changes: `python infra/deploy.py` (idempotent — rebuilds/pushes the image and
+updates the existing Lambda function in place). Redeploy the chat UI by pushing `frontend/`'s contents to
+the `giacode17.github.io` repo (see git history there for the exact commands used).
 
 ## Setup
 
@@ -86,9 +100,12 @@ crdb_mcp/      MCP client wrapper around the CockroachDB Managed MCP Server
 agent/         LLM tool-use loop, tool implementations, embeddings, orchestrator
 api/           FastAPI app (local + Lambda handler via Mangum)
 infra/         Dockerfile, requirements-lambda.txt, deploy.py (ECR/IAM/Lambda/Function URL via boto3)
-frontend/      plain HTML/JS chat UI
+frontend/      plain HTML/JS chat UI (also deployed standalone to giacode17.github.io)
 scripts/       run_agent_cli.py — local test harness
 tests/         integration tests against a live seeded cluster
+docs/          architecture.svg
+SUBMISSION.md  hackathon judging writeup (features, CockroachDB/AWS tools used, feedback)
+LICENSE        MIT
 ```
 
 ## Verified working end-to-end
@@ -146,3 +163,7 @@ every layer. The MCP tool schema (`crdb_mcp/mcp_client.py`) reflects the server'
 - Optional: swap embeddings to Voyage AI if Bedrock Titan access approval is slow.
 - Optional: tear down the now-unused `insurance-navigator-api` API Gateway HTTP API resource (superseded
   by the Function URL, harmless but unnecessary cruft left from an earlier deploy attempt).
+
+## License
+
+[MIT](LICENSE)
