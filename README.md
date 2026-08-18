@@ -1,16 +1,15 @@
 # Insurance Navigator Agent
 
 Hackathon submission for the **CockroachDB × AWS Hackathon** ("Build with Agentic Memory").
+Built with [Claude Code](https://claude.com/claude-code).
 
 - **Live demo**: https://giacode17.github.io
 - **API**: https://gzjlbbqcb7otg5xtebur7766o40jatel.lambda-url.us-west-2.on.aws
 - **License**: [MIT](LICENSE)
-- Full writeup for judging (features, which CockroachDB/AWS tools were used and how, feedback): [SUBMISSION.md](SUBMISSION.md)
 
 An agent that stores an employee's insurance plan, recommends where to seek care for a symptom (with a
 cost-tier estimate) grounded in the plan's real Summary of Benefits and Coverage (SBC) text, logs visits,
-and at renewal time suggests whether to switch plans based on that logged history. This doc covers
-setup/running the code — see [SUBMISSION.md](SUBMISSION.md) for the hackathon-judging writeup.
+and at renewal time suggests whether to switch plans based on that logged history.
 
 ## Architecture
 
@@ -104,7 +103,6 @@ frontend/      plain HTML/JS chat UI (also deployed standalone to giacode17.gith
 scripts/       run_agent_cli.py — local test harness
 tests/         integration tests against a live seeded cluster
 docs/          architecture.svg
-SUBMISSION.md  hackathon judging writeup (features, CockroachDB/AWS tools used, feedback)
 LICENSE        MIT
 ```
 

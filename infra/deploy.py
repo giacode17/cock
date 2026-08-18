@@ -125,6 +125,13 @@ def ensure_execution_role() -> str:
 
 
 def ensure_lambda_function(image_uri: str, role_arn: str) -> str:
+    # MemorySize=2048, not 1024: Lambda's cold-start INIT phase has a hard,
+    # fixed 10s cap regardless of the function's own Timeout, and this
+    # function's import graph (anthropic, boto3, fastapi, mangum, and
+    # especially mcp -> jsonschema/opentelemetry/cryptography/uvicorn) was
+    # occasionally exceeding it ("INIT_REPORT ... Status: timeout" in
+    # CloudWatch). More memory means proportionally more CPU during init,
+    # which is what actually speeds this up.
     env_vars = {k: os.environ[k] for k in RUNTIME_ENV_KEYS if k in os.environ}
     try:
         resp = lambda_client.create_function(
@@ -133,7 +140,7 @@ def ensure_lambda_function(image_uri: str, role_arn: str) -> str:
             Code={"ImageUri": image_uri},
             Role=role_arn,
             Timeout=120,
-            MemorySize=1024,
+            MemorySize=2048,
             Architectures=["arm64"],
             Environment={"Variables": env_vars},
         )
@@ -146,7 +153,7 @@ def ensure_lambda_function(image_uri: str, role_arn: str) -> str:
             FunctionName=LAMBDA_FUNCTION_NAME,
             Role=role_arn,
             Timeout=120,
-            MemorySize=1024,
+            MemorySize=2048,
             Environment={"Variables": env_vars},
         )
         print(f"Updated Lambda function {LAMBDA_FUNCTION_NAME}")

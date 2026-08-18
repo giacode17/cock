@@ -92,6 +92,13 @@ class MCPClient:
         return [t.name for t in result.tools]
 
     async def call_tool(self, name: str, arguments: dict):
+        # Printed (not just returned) so every MCP call is visible in
+        # CloudWatch Logs when running on Lambda — the clearest way to show
+        # that runtime reads/writes really go through the Managed MCP Server
+        # rather than a direct SQL connection. Query text is truncated since
+        # vector-search queries inline a ~1024-number embedding literal.
+        query_preview = str(arguments.get("query", ""))[:160].replace("\n", " ").strip()
+        print(f"[MCP] {name} database={arguments.get('database')} query={query_preview!r}")
         return await self._session.call_tool(name, arguments)
 
     async def select_query(self, sql: str) -> list[dict]:
